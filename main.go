@@ -11,9 +11,27 @@ import (
 	"github.com/signintech/gopdf"
 )
 
-func main() {
+var workDir string = "zip2pdf-work"
+var srcDir string = "zip2pdf-src"
+var destDir string = "zip2pdf-dest"
 
-	zipFileName := "test.zip"
+type AppContext struct {
+	home string //home dir
+	src  string //dir include zip files
+	dest string //pdf output dir
+	work string //work dir(tmp)
+}
+
+func main() {
+	//初期設定
+	app := initializer()
+
+	zipfiles, err := filepath.Glob("*.zip")
+	if err != nil {
+		panic(err)
+	}
+
+	zipFileName := "(C78) (同人誌) [bolze.] Powerless Flower (ハヤテのごとく！).zip"
 	extractPath := "."
 
 	zipReader, err := zip.OpenReader(zipFileName)
@@ -50,6 +68,43 @@ func main() {
 	}
 
 	pdf.WritePdf("output.pdf")
+
+	//finish
+	cleanUp(app)
+}
+
+func initializer() AppContext {
+	//初期化
+	home := os.Getenv("HOME")
+	if len(home) == 0 {
+		//home not set
+		fmt.Printf("init error: %s", "HOMEが設定されていません")
+	}
+	tmp := os.Getenv("TMP")
+	if len(tmp) == 0 {
+		//tmp not set
+		fmt.Printf("init error: %s", "TMPが設定されていません")
+	}
+
+	//オプションで任意設定できるようにする予定
+	context := AppContext{
+		home: home,
+		src:  filepath.Join(home, srcDir),
+		dest: filepath.Join(home, destDir),
+		work: filepath.Join(tmp, workDir)}
+
+	//作業ディレクトリ作成
+	os.Mkdir(context.work, os.ModePerm)
+
+	return context
+}
+
+func cleanUp(context AppContext) {
+	//掃除
+	err := os.Remove(context.work)
+	if err != nil {
+		fmt.Printf("clean up error: %s", "作業フォルダ削除に失敗しました")
+	}
 }
 
 func extractFile(zf *zip.File, dest string) {
