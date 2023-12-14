@@ -2,30 +2,19 @@ package main
 
 import (
 	"archive/zip"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
-	"github.com/signintech/gopdf"
+	"github.com/sunshineplan/imgconv"
+
+	"github.com/pdfcpu/pdfcpu/pkg/api"
 )
 
-var workDir string = "zip2pdf-work"
-var srcDir string = "zip2pdf-src"
-var destDir string = "zip2pdf-dest"
-
-type AppContext struct {
-	home string //home dir
-	src  string //dir include zip files
-	dest string //pdf output dir
-	work string //work dir(tmp)
-}
-
 func main() {
-	//初期設定
-	app := initializer()
 
 	zipfiles, err := filepath.Glob("*.zip")
 	check(err)
@@ -36,16 +25,14 @@ func main() {
 		go func(zipFile string) {
 			defer wg.Done()
 			//処理関数
-			extractAndCreatePDF(app, zipFile)
+			extractAndCreatePDF(zipFile)
 		}(zipFile)
 	}
 	wg.Wait()
 
-	//finish
-	cleanUp(app)
 }
 
-func extractAndCreatePDF(app AppContext, zipFile string) {
+func extractAndCreatePDF(zipFile string) {
 	tempDir, err := os.MkdirTemp("", "extracted")
 	check(err)
 	defer os.RemoveAll(tempDir)
@@ -77,67 +64,51 @@ func extractAndCreatePDF(app AppContext, zipFile string) {
 			}
 		}
 	}
-	createPDF2(images, strings.TrimSuffix(zipFile, ".zip")+".pdf")
+	createPDF(zipFile, images)
 }
 
-func createPDF(images []string, pdfFileName string) {
+func createPDF(zipFile string, images []string) {
 
-}
+	var pdfarray []string
 
-func createPDF2(images []string, pdfFileName string) {
-	// pdf := gofpdf.New("P", "mm", "A4", "")
-	pdf := gopdf.GoPdf{}
-	// pdf.Start(gopdf.Config{})
-	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeB4})
+	//PDF filename
+	pdfFile := strings.TrimSuffix(zipFile, filepath.Ext(zipFile)) + ".pdf"
+	sort.Slice(images, func(i, j int) bool {
+		return images[i] < images[j]
+	})
+
+	//image file convert to pdf
 	for _, img := range images {
+		src, err := imgconv.Open(img)
+		check(err)
 
-		pdf.AddPageWithOption(gopdf.PageOption{PageSize: &gopdf.Rect{W: 1147, H: 1600}})
-		// pdf.AddPage()
-		pdf.Image(img, 0, 0, nil)
+		//debug
+		// fmt.Println(img)
+
+		fpdf := replaceExt(img, "pdf")
+		pdfarray = append(pdfarray, fpdf)
+		ff, err := os.Create(fpdf)
+		check(err)
+		defer ff.Close()
+
+		err = imgconv.Write(ff, src, &imgconv.FormatOption{Format: imgconv.PDF})
+		check(err)
 	}
 
-	// err := pdf.OutputFileAndClose(pdfFileName)
-	err := pdf.WritePdf(pdfFileName)
+	sort.Slice(pdfarray, func(i, j int) bool {
+		return pdfarray[i] < pdfarray[j]
+	})
+	err := api.MergeCreateFile(pdfarray, pdfFile, api.LoadConfiguration())
 	check(err)
-	fmt.Printf("PDF created: %s\n", pdfFileName)
+
+}
+
+func replaceExt(file, to string) string {
+	return strings.TrimSuffix(file, filepath.Ext(file)) + "." + to
 }
 
 func check(e error) {
 	if e != nil {
 		panic(e)
-	}
-}
-
-func initializer() AppContext {
-	//初期化
-	home := os.Getenv("HOME")
-	if len(home) == 0 {
-		//home not set
-		fmt.Printf("init error: %s", "HOMEが設定されていません")
-	}
-	tmp := os.Getenv("TMP")
-	if len(tmp) == 0 {
-		//tmp not set
-		fmt.Printf("init error: %s", "TMPが設定されていません")
-	}
-
-	//オプションで任意設定できるようにする予定
-	context := AppContext{
-		home: home,
-		src:  filepath.Join(home, srcDir),
-		dest: filepath.Join(home, destDir),
-		work: filepath.Join(tmp, workDir)}
-
-	//作業ディレクトリ作成
-	os.Mkdir(context.work, os.ModePerm)
-
-	return context
-}
-
-func cleanUp(context AppContext) {
-	//掃除
-	err := os.Remove(context.work)
-	if err != nil {
-		fmt.Printf("clean up error: %s", "作業フォルダ削除に失敗しました")
 	}
 }
