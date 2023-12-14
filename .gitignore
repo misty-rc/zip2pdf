@@ -1,2 +1,6 @@
 *.zip
 *.pdf
+archive/**
+archive/*
+zip2pdf-extracted/**
+zip2pdf-extracted/*
