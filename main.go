@@ -6,7 +6,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
+	"strings"
+	"sync"
 
 	"github.com/signintech/gopdf"
 )
@@ -27,50 +28,84 @@ func main() {
 	app := initializer()
 
 	zipfiles, err := filepath.Glob("*.zip")
-	if err != nil {
-		panic(err)
+	check(err)
+
+	var wg sync.WaitGroup
+	for _, zipFile := range zipfiles {
+		wg.Add(1)
+		go func(zipFile string) {
+			defer wg.Done()
+			//処理関数
+			extractAndCreatePDF(app, zipFile)
+		}(zipFile)
 	}
-
-	zipFileName := "(C78) (同人誌) [bolze.] Powerless Flower (ハヤテのごとく！).zip"
-	extractPath := "."
-
-	zipReader, err := zip.OpenReader(zipFileName)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer zipReader.Close()
-
-	var imageFiles []string
-	for _, file := range zipReader.File {
-		filePath := filepath.Join(extractPath, file.Name)
-		if file.FileInfo().IsDir() {
-			os.MkdirAll(filePath, os.ModePerm)
-			continue
-		}
-
-		if filepath.Ext(filePath) == ".jpg" || filepath.Ext(filePath) == ".png" {
-			imageFiles = append(imageFiles, filePath)
-			extractFile(file, filePath)
-		}
-	}
-
-	sort.Strings(imageFiles)
-
-	pdf := gopdf.GoPdf{}
-	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
-	for _, imgPath := range imageFiles {
-		pdf.AddPage()
-		if err := pdf.Image(imgPath, 0, 0, nil); err != nil {
-			fmt.Println(err)
-			return
-		}
-	}
-
-	pdf.WritePdf("output.pdf")
+	wg.Wait()
 
 	//finish
 	cleanUp(app)
+}
+
+func extractAndCreatePDF(app AppContext, zipFile string) {
+	tempDir, err := os.MkdirTemp("", "extracted")
+	check(err)
+	defer os.RemoveAll(tempDir)
+
+	zf, err := zip.OpenReader(zipFile)
+	check(err)
+	defer zf.Close()
+
+	var images []string
+	for _, file := range zf.File {
+		fPath := filepath.Join(tempDir, file.Name)
+
+		if file.FileInfo().IsDir() {
+			os.MkdirAll(fPath, os.ModePerm)
+		} else {
+			outFile, err := os.Create(fPath)
+			check(err)
+			defer outFile.Close()
+
+			rc, err := file.Open()
+			check(err)
+			defer rc.Close()
+
+			_, err = io.Copy(outFile, rc)
+			check(err)
+
+			if filepath.Ext(fPath) == ".jpg" || filepath.Ext(fPath) == ".png" {
+				images = append(images, fPath)
+			}
+		}
+	}
+	createPDF2(images, strings.TrimSuffix(zipFile, ".zip")+".pdf")
+}
+
+func createPDF(images []string, pdfFileName string) {
+
+}
+
+func createPDF2(images []string, pdfFileName string) {
+	// pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf := gopdf.GoPdf{}
+	// pdf.Start(gopdf.Config{})
+	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeB4})
+	for _, img := range images {
+
+		pdf.AddPageWithOption(gopdf.PageOption{PageSize: &gopdf.Rect{W: 1147, H: 1600}})
+		// pdf.AddPage()
+		pdf.Image(img, 0, 0, nil)
+	}
+
+	// err := pdf.OutputFileAndClose(pdfFileName)
+	err := pdf.WritePdf(pdfFileName)
+	check(err)
+	fmt.Printf("PDF created: %s\n", pdfFileName)
+}
+
+func check(e error) {
+	if e != nil {
+		panic(e)
+	}
 }
 
 func initializer() AppContext {
@@ -104,27 +139,5 @@ func cleanUp(context AppContext) {
 	err := os.Remove(context.work)
 	if err != nil {
 		fmt.Printf("clean up error: %s", "作業フォルダ削除に失敗しました")
-	}
-}
-
-func extractFile(zf *zip.File, dest string) {
-
-	f, err := zf.Open()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer f.Close()
-
-	outfile, err := os.Create(dest)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer outfile.Close()
-
-	_, err = io.Copy(outfile, f)
-	if err != nil {
-		fmt.Println(err)
 	}
 }
