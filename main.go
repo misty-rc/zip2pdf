@@ -41,37 +41,6 @@ func extractAndCreatePDF(zipFile string) {
 	images, err := unzipAndCopy(zipFile, "zip2pdf-extracted")
 	check(err)
 
-	// tempDir, err := os.MkdirTemp("", "extracted")
-	// check(err)
-	// defer os.RemoveAll(tempDir)
-
-	// zf, err := zip.OpenReader(zipFile)
-	// check(err)
-	// defer zf.Close()
-
-	// var images []string
-	// for _, file := range zf.File {
-	// 	fPath := filepath.Join(tempDir, file.Name)
-
-	// 	if file.FileInfo().IsDir() {
-	// 		os.MkdirAll(fPath, os.ModePerm)
-	// 	} else {
-	// 		outFile, err := os.Create(fPath)
-	// 		check(err)
-	// 		defer outFile.Close()
-
-	// 		rc, err := file.Open()
-	// 		check(err)
-	// 		defer rc.Close()
-
-	// 		_, err = io.Copy(outFile, rc)
-	// 		check(err)
-
-	// 		if filepath.Ext(fPath) == ".jpg" || filepath.Ext(fPath) == ".png" {
-	// 			images = append(images, fPath)
-	// 		}
-	// 	}
-	// }
 	createPDF(zipFile, images)
 }
 
@@ -80,9 +49,6 @@ func unzipAndCopy(src, dest string) ([]string, error) {
 
 	err := os.MkdirAll(dest, os.ModeDir)
 	check(err)
-	// tempDir, err := os.MkdirTemp("", dest)
-	// check(err)
-	// defer os.RemoveAll(tempDir)
 
 	//open zip
 	r, err := zip.OpenReader(src)
