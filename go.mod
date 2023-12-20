@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/pdfcpu/pdfcpu v0.5.0
 	github.com/sunshineplan/imgconv v1.1.8
+	golang.org/x/text v0.14.0
 )
 
 require (
@@ -16,6 +17,5 @@ require (
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/sunshineplan/pdf v1.0.7 // indirect
 	golang.org/x/image v0.14.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
